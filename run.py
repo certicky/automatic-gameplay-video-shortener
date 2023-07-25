@@ -4,6 +4,9 @@ import numpy as np
 from moviepy.editor import VideoFileClip, concatenate_videoclips, ImageClip
 from moviepy.video.fx.fadein import fadein
 from moviepy.video.fx.fadeout import fadeout
+from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+from moviepy.video.VideoClip import ImageClip
+from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
 from PIL import Image, ImageDraw, ImageFont
 from scipy.spatial import distance
 
@@ -108,6 +111,56 @@ for t in scene_changes:
 
 # Create the final splash screen clip and add it to the trailer clips
 trailer_clips.append(splash_screen)
+
+###########################################
+
+# Define font size
+font_size = 70  # adjust based on your preference
+url_font_size = 40  # adjust based on your preference
+
+# Get the middle scene time and its clip
+middle_scene_time = scene_changes[len(scene_changes)//2]
+middle_scene_clip = video_clip.subclip(middle_scene_time, min(middle_scene_time + max_scene_duration, video_clip.duration))
+
+# Define blur radius
+blur_radius = 47  # adjust based on your preference
+
+# Apply a Gaussian blur to each frame of the scene
+blurred_scene_frames = [cv2.GaussianBlur(frame, (blur_radius, blur_radius), 0) for frame in middle_scene_clip.iter_frames()]
+blurred_scene_clip = ImageSequenceClip(blurred_scene_frames, fps=middle_scene_clip.fps)
+
+# Create a text image for the game name
+game_name_image = Image.new('RGBA', video_clip.size, (0, 0, 0, 0))
+draw = ImageDraw.Draw(game_name_image)
+game_name_width, game_name_height = draw.textsize(game_name, font)
+game_name_x = (game_name_image.width - game_name_width) / 2
+game_name_y = (game_name_image.height - game_name_height) / 2
+draw.text((game_name_x, game_name_y), game_name, fill='white', font=font)
+
+# Convert the text image to a MoviePy clip
+game_name_clip = ImageClip(np.array(game_name_image)).set_duration(splash_screen_duration)
+
+# Overlay the game name on the blurred scene
+intro = CompositeVideoClip([blurred_scene_clip, game_name_clip.set_pos("center")])
+
+# Create a text image for the game name and the game url for the outro
+outro_image = Image.new('RGB', video_clip.size, 'black')
+draw = ImageDraw.Draw(outro_image)
+draw.text((game_name_x, game_name_y), game_name, fill='white', font=font)
+
+game_url_width, game_url_height = draw.textsize(game_url, font)
+game_url_x = (background.width - game_url_width) / 2
+game_url_y = game_name_y + game_name_height + 10  # The 10 is for a 10 pixel gap between the game name and the URL
+draw.text((game_url_x, game_url_y), game_url, fill='white', font=font)
+
+# Convert the outro image to a MoviePy clip
+outro_clip = ImageClip(np.array(outro_image), duration=splash_screen_duration)
+
+# Replace the initial and final splash screen clips in the trailer
+trailer_clips[0] = intro
+trailer_clips[-1] = outro_clip
+
+###################################
 
 # Concatenate the clips to form the final trailer
 trailer = concatenate_videoclips(trailer_clips)
