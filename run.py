@@ -13,7 +13,7 @@ from scipy.spatial import distance
 # Config Parameters
 TRAILER_DURATION = 45
 SPLASH_SCREEN_DURATION = 5
-MAX_SCENE_DURATION = 10
+MAX_SCENE_DURATION = 8
 CROSSFADE_DURATION = 1
 OUTPUT_PATH = "output.mp4"
 FONT_SIZE = 70
@@ -36,10 +36,11 @@ GAME_NAME = args.GAME_NAME
 SUB_TITLE = args.SUB_TITLE
 VIDEO_PATH = args.VIDEO_PATH
 
-def detect_scenes(video_clip, threshold):
+def detect_scenes(video_clip, threshold, sample_rate=20):
+    print("Detecting scenes...")
     prev_frame = None
     scene_changes = []
-    for t in range(int(video_clip.duration)):
+    for t in range(0, int(video_clip.duration), sample_rate):
         frame = video_clip.get_frame(t)
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if prev_frame is not None:
@@ -47,16 +48,18 @@ def detect_scenes(video_clip, threshold):
             if np.mean(frame_diff) > threshold:
                 scene_changes.append(t)
         prev_frame = frame_gray
+    print("Detected scenes:", len(scene_changes))
     return scene_changes
 
-
 def create_blurred_clip(middle_scene_clip, blur_radius):
+    print("Creating blurred clip...")
     blurred_scene_frames = [cv2.GaussianBlur(frame, (blur_radius, blur_radius), 0) 
                             for frame in middle_scene_clip.iter_frames()]
-    blurred_scene_clip = ImageSequenceClip(blurred_scene_frames, fps=middle_scene_clip.fps)
+    blurred_scene_clip = ImageSequenceClip(blurred_scene_frames, fps=int(middle_scene_clip.fps))
     return blurred_scene_clip
 
 def create_text_clip(text, font, duration, pos):
+    print("Creating text clip...")
     text_image = Image.new('RGBA', video_clip.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(text_image)
     text_width, text_height = draw.textsize(text, font)
@@ -71,6 +74,7 @@ def create_text_clip(text, font, duration, pos):
     return text_clip
 
 def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
+    print("Creating trailer clips...")
     trailer_clips = []
     included_histograms = []
     for t in scene_changes:
@@ -100,13 +104,23 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
 
 
 # Load the video file
+print("Loading the video...")
 video_clip = VideoFileClip(VIDEO_PATH)
+print("Loaded video FPS:", int(video_clip.fps))
+
+# Calculate the threshold over a subset of frames
+print("Computing threshold...")
+num_samples = 250
+interval = video_clip.duration // num_samples
+sample_times = [i * interval for i in range(num_samples)]
+frames = (video_clip.get_frame(t) for t in sample_times) # calculate the threshold over uniformly chosen frames
+threshold = np.mean([np.mean(frame) for frame in frames]) * 1.1
 
 # Scene detection
-threshold = np.mean([np.mean(frame) for frame in video_clip.iter_frames()]) * 1.1
 scene_changes = detect_scenes(video_clip, threshold)
 
 # Create intro and outro
+print("Creating intro and outro...")
 middle_scene_time = scene_changes[len(scene_changes)//2]
 middle_scene_clip = video_clip.subclip(middle_scene_time, min(middle_scene_time + SPLASH_SCREEN_DURATION, video_clip.duration))
 blurred_scene_clip = create_blurred_clip(middle_scene_clip, BLUR_RADIUS)
@@ -115,7 +129,6 @@ intro = CompositeVideoClip([blurred_scene_clip, create_text_clip(GAME_NAME, font
 
 font_outro_title = ImageFont.truetype("arial_bold.ttf", int(FONT_SIZE / 2))
 font_outro_url = ImageFont.truetype("arial_bold.ttf", FONT_SIZE_SUBTITLE)
-
 title_clip = create_text_clip(GAME_NAME, font_outro_title, SPLASH_SCREEN_DURATION, "center")
 url_clip = create_text_clip(SUB_TITLE, font_outro_url, SPLASH_SCREEN_DURATION, ("center", int(FONT_SIZE / 2) + 25))
 outro = CompositeVideoClip([title_clip, url_clip])
@@ -129,6 +142,7 @@ trailer_clips.insert(0, intro)
 trailer_clips.append(outro)
 
 # Concatenate the clips to form the final trailer
+print("Concatenating the scenes into final video...")
 trailer = concatenate_videoclips(trailer_clips)
 
 # Write the trailer to a file
