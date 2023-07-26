@@ -1,5 +1,5 @@
 # Required Libraries
-import cv2
+import cv2, argparse
 import numpy as np
 from moviepy.editor import VideoFileClip, concatenate_videoclips, ImageClip
 from moviepy.video.fx.fadein import fadein
@@ -13,16 +13,28 @@ from scipy.spatial import distance
 # Config Parameters
 TRAILER_DURATION = 45
 SPLASH_SCREEN_DURATION = 5
-GAME_NAME = "Shards of God"
-SUBTITLE = "Play for free at:\nhttps://hvavra.itch.io/shards-of-god"
 MAX_SCENE_DURATION = 10
 CROSSFADE_DURATION = 1
-VIDEO_PATH = "input.mp4"
 OUTPUT_PATH = "output.mp4"
 FONT_SIZE = 70
 FONT_SIZE_SUBTITLE = 18
 BLUR_RADIUS = 47
 
+# Create the parser
+parser = argparse.ArgumentParser(description='Create a game trailer from gameplay footage.')
+
+# Add the arguments
+parser.add_argument('GAME_NAME', type=str, help='The name of the game')
+parser.add_argument('SUB_TITLE', type=str, help='The subtitle text')
+parser.add_argument('VIDEO_PATH', type=str, help='The path to the input video')
+
+# Parse the arguments
+args = parser.parse_args()
+
+# Assign the arguments to variables
+GAME_NAME = args.GAME_NAME
+SUB_TITLE = args.SUB_TITLE
+VIDEO_PATH = args.VIDEO_PATH
 
 def detect_scenes(video_clip, threshold):
     prev_frame = None
@@ -105,7 +117,7 @@ font_outro_title = ImageFont.truetype("arial_bold.ttf", int(FONT_SIZE / 2))
 font_outro_url = ImageFont.truetype("arial_bold.ttf", FONT_SIZE_SUBTITLE)
 
 title_clip = create_text_clip(GAME_NAME, font_outro_title, SPLASH_SCREEN_DURATION, "center")
-url_clip = create_text_clip(SUBTITLE, font_outro_url, SPLASH_SCREEN_DURATION, ("center", int(FONT_SIZE / 2) + 25))
+url_clip = create_text_clip(SUB_TITLE, font_outro_url, SPLASH_SCREEN_DURATION, ("center", int(FONT_SIZE / 2) + 25))
 outro = CompositeVideoClip([title_clip, url_clip])
 
 # Create trailer clips
