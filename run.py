@@ -4,6 +4,7 @@ import numpy as np
 from moviepy.editor import VideoFileClip, concatenate_videoclips, ImageClip
 from moviepy.video.fx.fadein import fadein
 from moviepy.video.fx.fadeout import fadeout
+from moviepy.audio.fx.all import audio_fadein, audio_fadeout
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 from moviepy.video.VideoClip import ImageClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
@@ -208,12 +209,16 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
                 longest_clip = gc["clip"]
                 longest_clip_start_time = gc["start"]
 
-        longest_clip = fadein(longest_clip, CROSSFADE_DURATION)
-        longest_clip = fadeout(longest_clip, CROSSFADE_DURATION)
         print("Selecting a clip with duration of", longest_clip.duration, "from a group of", len(group), "visually similar clips.")
         if longest_clip.duration < max_scene_duration:
             print("  ... prolonging it to", max_scene_duration, "using start time of", longest_clip_start_time)
             longest_clip = video_clip.subclip(longest_clip_start_time, longest_clip_start_time + max_scene_duration)
+
+        longest_clip = fadein(longest_clip, CROSSFADE_DURATION)
+        longest_clip = fadeout(longest_clip, CROSSFADE_DURATION)
+        longest_clip.audio = audio_fadein(longest_clip.audio, CROSSFADE_DURATION)
+        longest_clip.audio = audio_fadeout(longest_clip.audio, CROSSFADE_DURATION)
+
         trailer_clips.append(longest_clip)
         remaining_duration -= longest_clip.duration
         if remaining_duration <= 0:
