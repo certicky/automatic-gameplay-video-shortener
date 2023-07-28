@@ -145,8 +145,10 @@ def get_loud_segments(scene_clip):
 
 def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
     print("Creating trailer clips...")
-    trailer_clips = []
-    included_histograms = []
+    # Keep track of visually similar groups of clips
+    clip_groups = []
+    group_histograms = []
+
     for t in scene_changes:
         if remaining_duration <= 0:
             break
@@ -174,21 +176,49 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
         first_frame = first_frame.astype(np.uint8)
         first_frame = cv2.cvtColor(first_frame, cv2.COLOR_RGB2HSV)    
 
-        # make sure we don't include two very visually similar clips in the traler (based on the histogram of the 1st frame)
+        # calculate histogram of the 1st frame
         hist = cv2.calcHist([first_frame], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
         hist = cv2.normalize(hist, hist).flatten()
-        if included_histograms:
-            correlations = [distance.correlation(hist, included_hist) for included_hist in included_histograms]
-            if max(correlations) > 0.5:
-                print("Skipping this clip, since it's visually too similar to already used clip.")
-                continue
-        included_histograms.append(hist)
 
-        scene_clip = fadein(scene_clip, CROSSFADE_DURATION)
-        scene_clip = fadeout(scene_clip, CROSSFADE_DURATION)
+        # compare with existing groups of visually similar clips
+        for i, group_hist in enumerate(group_histograms):
+            if distance.correlation(hist, group_hist) > 0.5:
+                # if it's visually similar to an existing group, add it to that group
+                clip_groups[i].append({
+                        "clip": scene_clip,
+                        "start": start_time
+                    })
+                break
+        else:
+            # if it's not visually similar to any existing group, create a new group
+            clip_groups.append([{
+                "clip": scene_clip,
+                "start": start_time
+            }])
+            group_histograms.append(hist)
 
-        trailer_clips.append(scene_clip)
-        remaining_duration -= scene_clip.duration
+    # Select the longest clip from each group
+    trailer_clips = []
+    print("There are", len(clip_groups), "groups of visually similar clips.")
+    for group in clip_groups:
+        longest_clip = group[0]["clip"]
+        longest_clip_start_time = group[0]["start"]
+        for gc in group:
+            if gc["clip"].duration > longest_clip.duration:
+                longest_clip = gc["clip"]
+                longest_clip_start_time = gc["start"]
+
+        longest_clip = fadein(longest_clip, CROSSFADE_DURATION)
+        longest_clip = fadeout(longest_clip, CROSSFADE_DURATION)
+        print("Selecting a clip with duration of", longest_clip.duration, "from a group of", len(group), "visually similar clips.")
+        if longest_clip.duration < max_scene_duration:
+            print("  ... prolonging it to", max_scene_duration, "using start time of", longest_clip_start_time)
+            longest_clip = video_clip.subclip(longest_clip_start_time, longest_clip_start_time + max_scene_duration)
+        trailer_clips.append(longest_clip)
+        remaining_duration -= longest_clip.duration
+        if remaining_duration <= 0:
+            break
+
     return trailer_clips
 
 
