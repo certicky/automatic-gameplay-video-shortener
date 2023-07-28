@@ -18,7 +18,7 @@ SPLASH_SCREEN_DURATION = 5
 MAX_SCENE_DURATION = 8
 CROSSFADE_DURATION = 1
 OUTPUT_PATH = "output.mp4"
-FONT_SIZE = 70
+FONT_SIZE = 90
 FONT_SIZE_SUBTITLE = 18
 BLUR_RADIUS = 47
 
@@ -248,10 +248,10 @@ print("Creating intro and outro...")
 middle_scene_time = scene_changes[len(scene_changes)//2]
 middle_scene_clip = video_clip.subclip(middle_scene_time, min(middle_scene_time + SPLASH_SCREEN_DURATION, video_clip.duration))
 blurred_scene_clip = create_blurred_clip(middle_scene_clip, BLUR_RADIUS)
-font_intro = ImageFont.truetype("arial_bold.ttf", FONT_SIZE)
+font_intro = ImageFont.truetype("bebas_regular.ttf", FONT_SIZE)
 intro = CompositeVideoClip([blurred_scene_clip, create_text_clip(GAME_NAME, font_intro, SPLASH_SCREEN_DURATION, "center")])
 
-font_outro_title = ImageFont.truetype("arial_bold.ttf", int(FONT_SIZE / 2))
+font_outro_title = ImageFont.truetype("bebas_regular.ttf", int(FONT_SIZE / 2))
 font_outro_url = ImageFont.truetype("arial_bold.ttf", FONT_SIZE_SUBTITLE)
 title_clip = create_text_clip(GAME_NAME, font_outro_title, SPLASH_SCREEN_DURATION, "center")
 url_clip = create_text_clip(SUB_TITLE, font_outro_url, SPLASH_SCREEN_DURATION, ("center", int(FONT_SIZE / 2) + 25))
