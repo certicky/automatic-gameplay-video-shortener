@@ -1,5 +1,6 @@
 input.mp4
 output.mp4
+audio_temp.wav
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

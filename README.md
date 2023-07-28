@@ -10,6 +10,7 @@ Automatic Game Trailer Creator is a simple Python script that generates a short 
 - NumPy
 - SciPy
 - Pillow
+- librosa
 
 You can install the required packages using pip:
 

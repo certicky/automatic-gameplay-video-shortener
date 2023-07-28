@@ -1,5 +1,5 @@
 # Required Libraries
-import cv2, argparse
+import cv2, argparse, librosa, os
 import numpy as np
 from moviepy.editor import VideoFileClip, concatenate_videoclips, ImageClip
 from moviepy.video.fx.fadein import fadein
@@ -9,6 +9,7 @@ from moviepy.video.VideoClip import ImageClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
 from PIL import Image, ImageDraw, ImageFont
 from scipy.spatial import distance
+from sklearn.cluster import KMeans
 
 # Config Parameters
 TRAILER_DURATION = 45
@@ -73,6 +74,75 @@ def create_text_clip(text, font, duration, pos):
         text_clip = text_clip.set_position(pos)
     return text_clip
 
+def merge_segments(segments):
+    # Initialize merged segments with the first segment
+    merged_segments = [segments[0]]
+    
+    for current_start, current_end in segments[1:]:
+        # Get last segment in merged_segments list
+        last_segment_start, last_segment_end = merged_segments[-1]
+        
+        # If the current segment overlaps with the last merged segment, merge them
+        if current_start <= last_segment_end:
+            merged_segments[-1] = (last_segment_start, max(last_segment_end, current_end))
+        else:
+            # If not, add it as a new segment
+            merged_segments.append((current_start, current_end))
+    
+    return merged_segments
+
+def get_loud_segments(scene_clip):
+    FRAME_LENGTH_FACTOR = 0.05  # Frame size as a factor of sample rate
+    AUDIO_PATH = "audio_temp.wav"  # Temp path to save audio file
+    BUFFER = 1  # Buffer to add around each loud segment (in seconds)
+
+    # Write audio to a wav file
+    scene_clip.audio.write_audiofile(AUDIO_PATH, logger=None, verbose=False)
+
+    # Load audio file with librosa
+    y, sr = librosa.load(AUDIO_PATH)
+
+    # Calculate the short time energy of the audio signal
+    frame_length = int(sr * FRAME_LENGTH_FACTOR)
+    hop_length = frame_length // 2
+    energy = np.array([sum(abs(y[i:i+frame_length]**2)) for i in range(0, len(y), hop_length)])
+
+    # Reshape energy for k-means
+    energy = energy.reshape(-1, 1)
+
+    # Use k-means to classify energy into two clusters
+    kmeans = KMeans(n_clusters=2, random_state=0).fit(energy)
+    labels = kmeans.labels_
+
+    # Identify cluster label for "loud" and "quiet"
+    if np.mean(energy[labels == 0]) > np.mean(energy[labels == 1]):
+        loud_cluster = 0
+    else:
+        loud_cluster = 1
+
+    # Create segments
+    segments = []
+    start = 0
+    for i in range(1, len(labels)):
+        if labels[i] != labels[i-1]:  # If the label changes, we have a new segment
+            end = i
+            if labels[i-1] == loud_cluster:  # If the previous segment was loud
+                # Calculate segment start and end times (convert from frames to seconds)
+                start_time = max(0, start * hop_length / sr - BUFFER)
+                end_time = min(len(y) / sr, end * hop_length / sr + BUFFER)
+                # Make sure segment duration is a multiple of 3 seconds
+                duration = end_time - start_time
+                rounded_duration = np.ceil(duration / 3) * 3
+                end_time = start_time + rounded_duration
+                # Add segment to list
+                segments.append((start_time, end_time))
+            start = i
+
+    # Merge overlapping segments
+    merged_segments = merge_segments(segments)
+
+    return merged_segments
+
 def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
     print("Creating trailer clips...")
     trailer_clips = []
@@ -84,20 +154,39 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
         end_time = min(t + max_scene_duration, video_clip.duration)
         scene_clip = video_clip.subclip(start_time, end_time)
 
+        # get loud segments within the clip and move the start & end of a clip if there are some
+        loud_segments = get_loud_segments(scene_clip)
+        if len(loud_segments):
+            new_start = None
+            new_end = None
+            for loud_start, loud_end in loud_segments:
+                print(f"Loud segment from {loud_start} to {loud_end} seconds.")
+                if not new_start: new_start = loud_start
+                new_end = loud_end
+                if new_end > (new_start + max_scene_duration):
+                    break
+            start_time = t + new_start
+            end_time = t + new_end
+            print("New clip duration:", end_time - start_time)
+            scene_clip = video_clip.subclip(start_time, end_time)
+
         first_frame = scene_clip.get_frame(0) * 255
         first_frame = first_frame.astype(np.uint8)
         first_frame = cv2.cvtColor(first_frame, cv2.COLOR_RGB2HSV)    
 
+        # make sure we don't include two very visually similar clips in the traler (based on the histogram of the 1st frame)
         hist = cv2.calcHist([first_frame], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
         hist = cv2.normalize(hist, hist).flatten()
         if included_histograms:
             correlations = [distance.correlation(hist, included_hist) for included_hist in included_histograms]
             if max(correlations) > 0.5:
+                print("Skipping this clip, since it's visually too similar to already used clip.")
                 continue
         included_histograms.append(hist)
 
         scene_clip = fadein(scene_clip, CROSSFADE_DURATION)
         scene_clip = fadeout(scene_clip, CROSSFADE_DURATION)
+
         trailer_clips.append(scene_clip)
         remaining_duration -= scene_clip.duration
     return trailer_clips
