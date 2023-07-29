@@ -13,14 +13,15 @@ from scipy.spatial import distance
 from sklearn.cluster import KMeans
 
 # Config Parameters
-TRAILER_DURATION = 45
+TRAILER_DURATION = 60
 SPLASH_SCREEN_DURATION = 5
-MAX_SCENE_DURATION = 8
+MAX_SCENE_DURATION = 7
 CROSSFADE_DURATION = 1
 OUTPUT_PATH = "output.mp4"
 FONT_SIZE = 90
 FONT_SIZE_SUBTITLE = 18
 BLUR_RADIUS = 47
+PRESERVE_FOOTAGE_ORDERING = False
 
 # Create the parser
 parser = argparse.ArgumentParser(description='Create a game trailer from gameplay footage.')
@@ -144,7 +145,7 @@ def get_loud_segments(scene_clip):
 
     return merged_segments
 
-def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
+def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration, visual_similarity_threshold = 0.5):
     print("Creating trailer clips...")
     # Keep track of visually similar groups of clips
     clip_groups = []
@@ -163,14 +164,14 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
             new_start = None
             new_end = None
             for loud_start, loud_end in loud_segments:
-                print(f"Loud segment from {loud_start} to {loud_end} seconds.")
+                print(f"  Loud segment from {loud_start} to {loud_end} seconds.")
                 if not new_start: new_start = loud_start
                 new_end = loud_end
                 if new_end > (new_start + max_scene_duration):
                     break
             start_time = t + new_start
             end_time = t + new_end
-            print("New clip duration:", end_time - start_time)
+            print("  New clip duration:", end_time - start_time)
             scene_clip = video_clip.subclip(start_time, end_time)
 
         first_frame = scene_clip.get_frame(0) * 255
@@ -183,7 +184,7 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
 
         # compare with existing groups of visually similar clips
         for i, group_hist in enumerate(group_histograms):
-            if distance.correlation(hist, group_hist) > 0.5:
+            if distance.correlation(hist, group_hist) > visual_similarity_threshold:
                 # if it's visually similar to an existing group, add it to that group
                 clip_groups[i].append({
                         "clip": scene_clip,
@@ -197,10 +198,19 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration):
                 "start": start_time
             }])
             group_histograms.append(hist)
+    
+    # Check if there are enough clip groups and if there aren't,
+    # start again with higher threshold for visual similarity of clips
+    if len(clip_groups) * MAX_SCENE_DURATION < TRAILER_DURATION:
+        new_similarity_threshold = visual_similarity_threshold + ((1 - visual_similarity_threshold) / 2)
+        if new_similarity_threshold <= 0.9:
+            print("Too few groups of similar clips (" + str(len(clip_groups)) + ")! Starting again with similarity threshold of", new_similarity_threshold)
+            return create_trailer_clips(scene_changes, remaining_duration, max_scene_duration, new_similarity_threshold)
 
     # Select the longest clip from each group
     trailer_clips = []
     print("There are", len(clip_groups), "groups of visually similar clips.")
+    if not PRESERVE_FOOTAGE_ORDERING: clip_groups.sort(key=len, reverse=True)
     for group in clip_groups:
         longest_clip = group[0]["clip"]
         longest_clip_start_time = group[0]["start"]
