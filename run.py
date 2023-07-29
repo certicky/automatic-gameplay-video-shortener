@@ -20,7 +20,7 @@ CROSSFADE_DURATION = 1
 OUTPUT_PATH = "output.mp4"
 FONT_SIZE = 90
 FONT_SIZE_SUBTITLE = 18
-BLUR_RADIUS = 47
+BLUR_RADIUS = 51
 PRESERVE_FOOTAGE_ORDERING = False
 
 # Create the parser
@@ -65,15 +65,33 @@ def create_text_clip(text, font, duration, pos):
     print("Creating text clip...")
     text_image = Image.new('RGBA', video_clip.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(text_image)
-    text_width, text_height = draw.textsize(text, font)
-    text_x = (text_image.width - text_width) / 2
-    text_y = (text_image.height - text_height) / 2
-    draw.text((text_x, text_y), text, fill='white', font=font)
+    lines = text.encode().decode('unicode_escape').split('\n')
+    max_width = 0
+    total_height = 0
+    line_heights = []
+    for line in lines:  # calculate the dimensions of each line
+        text_width, text_height = draw.textsize(line, font)
+        max_width = max(max_width, text_width)
+        total_height += text_height
+        line_heights.append(text_height)
+
+    if len(lines) > 1:  # if the text contains multiple lines
+        text_x = 100  # 100px from the left side of the screen
+        text_y = (text_image.height - total_height) / 2  # vertically centered
+        for i, line in enumerate(lines):
+            draw.text((text_x, text_y), line, fill='white', font=font)
+            text_y += line_heights[i]  # move to the next line
+    else:  # if the text is a single line
+        text_x = (text_image.width - max_width) / 2
+        text_y = (text_image.height - total_height) / 2
+        draw.text((text_x, text_y), text, fill='white', font=font)
+
     text_clip = ImageClip(np.array(text_image)).set_duration(duration)
     if isinstance(pos, tuple) and len(pos) == 2 and pos[0] == "center":
         text_clip = text_clip.set_position(lambda t: ("center", pos[1] + t * 0))
     else:
         text_clip = text_clip.set_position(pos)
+    
     return text_clip
 
 def merge_segments(segments):
@@ -258,13 +276,15 @@ print("Creating intro and outro...")
 middle_scene_time = scene_changes[len(scene_changes)//2]
 middle_scene_clip = video_clip.subclip(middle_scene_time, min(middle_scene_time + SPLASH_SCREEN_DURATION, video_clip.duration))
 blurred_scene_clip = create_blurred_clip(middle_scene_clip, BLUR_RADIUS)
-font_intro = ImageFont.truetype("bebas_regular.ttf", FONT_SIZE)
+font_intro = ImageFont.truetype("NexaRustSlab-BlackShadow01.otf", FONT_SIZE)
 intro = CompositeVideoClip([blurred_scene_clip, create_text_clip(GAME_NAME, font_intro, SPLASH_SCREEN_DURATION, "center")])
 
-font_outro_title = ImageFont.truetype("bebas_regular.ttf", int(FONT_SIZE / 2))
+font_outro_title = ImageFont.truetype("NexaRustSlab-BlackShadow01.otf", int(FONT_SIZE / 2))
 font_outro_url = ImageFont.truetype("arial_bold.ttf", FONT_SIZE_SUBTITLE)
 title_clip = create_text_clip(GAME_NAME, font_outro_title, SPLASH_SCREEN_DURATION, "center")
-url_clip = create_text_clip(SUB_TITLE, font_outro_url, SPLASH_SCREEN_DURATION, ("center", int(FONT_SIZE / 2) + 25))
+
+lines = GAME_NAME.encode().decode('unicode_escape').split('\n')
+url_clip = create_text_clip(SUB_TITLE, font_outro_url, SPLASH_SCREEN_DURATION, ("center", int(FONT_SIZE / 2 * len(lines)) + 20))
 outro = CompositeVideoClip([title_clip, url_clip])
 
 # Create trailer clips
