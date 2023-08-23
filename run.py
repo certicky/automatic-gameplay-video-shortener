@@ -12,32 +12,37 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.spatial import distance
 from sklearn.cluster import KMeans
 
-# Config Parameters
-TRAILER_DURATION = 60
-SPLASH_SCREEN_DURATION = 5
-MAX_SCENE_DURATION = 7
-CROSSFADE_DURATION = 1
-OUTPUT_PATH = "output.mp4"
-FONT_SIZE = 90
-FONT_SIZE_SUBTITLE = 18
-BLUR_RADIUS = 51
-PRESERVE_FOOTAGE_ORDERING = False
-
-# Create the parser
+# Create CLI arguments the parser
 parser = argparse.ArgumentParser(description='Create a game trailer from gameplay footage.')
 
 # Add the arguments
 parser.add_argument('GAME_NAME', type=str, help='The name of the game')
-parser.add_argument('SUB_TITLE', type=str, help='The subtitle text')
+parser.add_argument('SUB_TITLE', type=str, help='The subtitle text (accepts empty string)')
 parser.add_argument('VIDEO_PATH', type=str, help='The path to the input video')
-
-# Parse the arguments
-args = parser.parse_args()
+parser.add_argument('--trailer-duration', type=int, default=60, help='Optional: Approximate duration of the trailer ins econds (default: 60)')
+parser.add_argument('--splash-screen-duration', type=int, default=5, help='Optional: Duration of the splash screen at the start and at the end (default: 5)')
+parser.add_argument('--max-scene-duration', type=int, default=7, help='Optional: Approximate duration of each clip (default: 7)')
+parser.add_argument('--crossfade-duration', type=int, default=1, help='Optional: Duration of the cross-fade between clips (default: 1)')
+parser.add_argument('--output-path', type=str, default='output.mp4', help='Optional: Path & name of the resulting file (default: output.mp4)')
+parser.add_argument('--font-size', type=int, default=90, help='Optional: Font size for the starting splash screen title (default: 90)')
+parser.add_argument('--font-size-subtitle', type=int, default=18, help='Optional: Font size for the end splash screen subtitle (default: 18)')
+parser.add_argument('--blur-radius', type=int, default=51, help='Optional: Amount of blur used for the start splash screen background (default: 51)')
+parser.add_argument('--preserve-footage-ordering', type=bool, default=False, help='Optional: Preserve the ordering of clips from the input footage? (default: false)')
 
 # Assign the arguments to variables
+args = parser.parse_args()
 GAME_NAME = args.GAME_NAME
 SUB_TITLE = args.SUB_TITLE
 VIDEO_PATH = args.VIDEO_PATH
+TRAILER_DURATION = args.trailer_duration
+SPLASH_SCREEN_DURATION = args.splash_screen_duration
+MAX_SCENE_DURATION = args.max_scene_duration
+CROSSFADE_DURATION = args.crossfade_duration
+OUTPUT_PATH = args.output_path
+FONT_SIZE = args.font_size
+FONT_SIZE_SUBTITLE = args.font_size_subtitle
+BLUR_RADIUS = args.blur_radius
+PRESERVE_FOOTAGE_ORDERING = args.preserve_footage_ordering
 
 def detect_scenes(video_clip, threshold, sample_rate=20):
     print("Detecting scenes...")
@@ -221,7 +226,7 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration, 
     # start again with higher threshold for visual similarity of clips
     if len(clip_groups) * MAX_SCENE_DURATION < TRAILER_DURATION:
         new_similarity_threshold = visual_similarity_threshold + ((1 - visual_similarity_threshold) / 2)
-        if new_similarity_threshold <= 0.9:
+        if new_similarity_threshold <= 0.999:
             print("Too few groups of similar clips (" + str(len(clip_groups)) + ")! Starting again with similarity threshold of", new_similarity_threshold)
             return create_trailer_clips(scene_changes, remaining_duration, max_scene_duration, new_similarity_threshold)
 
@@ -265,7 +270,7 @@ print("Computing threshold...")
 num_samples = 250
 interval = video_clip.duration // num_samples
 sample_times = [i * interval for i in range(num_samples)]
-frames = (video_clip.get_frame(t) for t in sample_times) # calculate the threshold over uniformly chosen frames
+frames = (video_clip.get_frame(t) for t in sample_times if t > 600) # calculate the threshold over uniformly chosen frames
 threshold = np.mean([np.mean(frame) for frame in frames]) * 1.1
 
 # Scene detection
