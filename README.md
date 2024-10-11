@@ -9,13 +9,13 @@ Automatic Game Trailer Creator is a simple Python script that generates a short 
 - OpenCV
 - NumPy
 - SciPy
-- Pillow
+- Pillow 9.5.0
 - librosa
 
 You can install the required packages using pip:
 
 ```bash
-pip install moviepy opencv-python numpy scipy pillow
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ To create a trailer, run the script from the command line with three arguments: 
 For example:
 
 ```bash
-python create_trailer.py "Shards of God" "Play for free at:\nhttps://hvavra.itch.io/shards-of-god" "input.mp4"
+python run.py "Shards of God" "Play for free at:\nhttps://hvavra.itch.io/shards-of-god" "input.mp4"
 ```
 
 This will create a trailer for the game "Shards of God" using the video in "input.mp4", and output the resulting trailer as "output.mp4".
