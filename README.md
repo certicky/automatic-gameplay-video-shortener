@@ -1,6 +1,8 @@
-# Automatic Game Trailer Creator
+# Automatic Gameplay Video Shortener
 
-Automatic Game Trailer Creator is a simple Python script that generates a short video trailer from a full game playthrough. It uses scene detection to identify interesting moments, and then stitches these scenes together into a compact trailer.
+Automatic Gameplay Video Shortener is a simple Python script that generates a short video from a full game playthrough. It uses scene detection to identify interesting moments, and then stitches these scenes together into a compact trailer.
+
+Why? You can upload the resulting short gameplay video to Twitter, where there's a 2-minute limit on video length.
 
 ## Requirements
 
@@ -9,7 +11,6 @@ Automatic Game Trailer Creator is a simple Python script that generates a short 
 - OpenCV
 - NumPy
 - SciPy
-- Pillow 9.5.0
 - librosa
 
 You can install the required packages using pip:
@@ -19,11 +20,11 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-To create a trailer, run the script from the command line with three arguments: the name of the game, the subtitle, and the path to the input video.
+To create a short video, run the script from the command line with the path to the input long video.
 For example:
 
 ```bash
-python run.py "Shards of God" "Play for free at:\nhttps://hvavra.itch.io/shards-of-god" "input.mp4"
+python run.py "input.mp4"
 ```
 
-This will create a trailer for the game "Shards of God" using the video in "input.mp4", and output the resulting trailer as "output.mp4".
+This will shorten the video in "input.mp4", and output the result as "output.mp4".
