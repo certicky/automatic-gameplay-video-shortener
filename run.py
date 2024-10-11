@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description='Create a short video from longer g
 
 # Add the arguments
 parser.add_argument('VIDEO_PATH', type=str, help='The path to the input video')
-parser.add_argument('--trailer-duration', type=int, default=105, help='Optional: Approximate duration of the output video in seconds (default: 105)')
+parser.add_argument('--trailer-duration', type=int, default=120, help='Optional: Approximate duration of the output video in seconds (default: 120)')
 parser.add_argument('--max-scene-duration', type=int, default=7, help='Optional: Approximate duration of each clip (default: 7)')
 parser.add_argument('--crossfade-duration', type=int, default=1, help='Optional: Duration of the cross-fade between clips (default: 1)')
 parser.add_argument('--output-path', type=str, default='output.mp4', help='Optional: Path & name of the resulting file (default: output.mp4)')
@@ -209,7 +209,7 @@ def create_trailer_clips(scene_changes, remaining_duration, max_scene_duration, 
 
 # Load the video file
 print("Loading the video...")
-video_clip = VideoFileClip(VIDEO_PATH)
+video_clip = VideoFileClip(VIDEO_PATH).resize(height=720)  # Resize to meet Twitter's requirements
 print("Loaded video FPS:", int(video_clip.fps))
 
 # Calculate the threshold over a subset of frames
@@ -232,4 +232,4 @@ print("Concatenating the scenes into final video...")
 trailer = concatenate_videoclips(trailer_clips)
 
 # Write the trailer to a file
-trailer.write_videofile(OUTPUT_PATH, codec='libx264', logger=None, verbose=False)
+trailer.write_videofile(OUTPUT_PATH, codec='libx264', fps=30, bitrate="5000k", audio_codec='aac', audio_bitrate='128k', logger=None, verbose=False)
