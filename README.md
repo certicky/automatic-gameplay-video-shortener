@@ -4,6 +4,11 @@ Automatic Gameplay Video Shortener is a simple Python script that generates a sh
 
 Why? You can upload the resulting short gameplay video to Twitter, where there's a 2-minute limit on video length.
 
+## Output Example
+https://youtu.be/MMkMs8FSYkg
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/MMkMs8FSYkg/0.jpg)](https://www.youtube.com/watch?v=MMkMs8FSYkg)
+
 ## Requirements
 
 - Python 3.7 or higher
@@ -28,3 +33,12 @@ python run.py "input.mp4"
 ```
 
 This will shorten the video in "input.mp4", and output the result as "output.mp4".
+
+## Music and other options
+You can also add a background music, or tweak some other settings. Here are your options:
+```bash
+usage: run.py [-h] [--trailer-duration TRAILER_DURATION] [--max-scene-duration MAX_SCENE_DURATION]
+              [--crossfade-duration CROSSFADE_DURATION] [--output-path OUTPUT_PATH]
+              [--preserve-footage-ordering PRESERVE_FOOTAGE_ORDERING] [--music-path MUSIC_PATH]
+              VIDEO_PATH
+```
