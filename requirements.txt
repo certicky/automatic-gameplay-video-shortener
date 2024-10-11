@@ -1,5 +1,5 @@
 numpy
-Pillow
+Pillow==9.5.0
 moviepy==1.0.3
 scipy
 opencv-python-headless
