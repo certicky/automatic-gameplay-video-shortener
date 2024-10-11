@@ -8,40 +8,27 @@ from moviepy.audio.fx.all import audio_fadein, audio_fadeout
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 from moviepy.video.VideoClip import ImageClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
-from PIL import Image, ImageDraw, ImageFont
 from scipy.spatial import distance
 from sklearn.cluster import KMeans
 
 # Create CLI arguments the parser
-parser = argparse.ArgumentParser(description='Create a game trailer from gameplay footage.')
+parser = argparse.ArgumentParser(description='Create a short video from longer gameplay footage.')
 
 # Add the arguments
-parser.add_argument('GAME_NAME', type=str, help='The name of the game')
-parser.add_argument('SUB_TITLE', type=str, help='The subtitle text (accepts empty string)')
 parser.add_argument('VIDEO_PATH', type=str, help='The path to the input video')
-parser.add_argument('--trailer-duration', type=int, default=60, help='Optional: Approximate duration of the trailer ins econds (default: 60)')
-parser.add_argument('--splash-screen-duration', type=int, default=5, help='Optional: Duration of the splash screen at the start and at the end (default: 5)')
+parser.add_argument('--trailer-duration', type=int, default=105, help='Optional: Approximate duration of the output video in seconds (default: 105)')
 parser.add_argument('--max-scene-duration', type=int, default=7, help='Optional: Approximate duration of each clip (default: 7)')
 parser.add_argument('--crossfade-duration', type=int, default=1, help='Optional: Duration of the cross-fade between clips (default: 1)')
 parser.add_argument('--output-path', type=str, default='output.mp4', help='Optional: Path & name of the resulting file (default: output.mp4)')
-parser.add_argument('--font-size', type=int, default=90, help='Optional: Font size for the starting splash screen title (default: 90)')
-parser.add_argument('--font-size-subtitle', type=int, default=18, help='Optional: Font size for the end splash screen subtitle (default: 18)')
-parser.add_argument('--blur-radius', type=int, default=51, help='Optional: Amount of blur used for the start splash screen background (default: 51)')
 parser.add_argument('--preserve-footage-ordering', type=bool, default=False, help='Optional: Preserve the ordering of clips from the input footage? (default: false)')
 
 # Assign the arguments to variables
 args = parser.parse_args()
-GAME_NAME = args.GAME_NAME
-SUB_TITLE = args.SUB_TITLE
 VIDEO_PATH = args.VIDEO_PATH
 TRAILER_DURATION = args.trailer_duration
-SPLASH_SCREEN_DURATION = args.splash_screen_duration
 MAX_SCENE_DURATION = args.max_scene_duration
 CROSSFADE_DURATION = args.crossfade_duration
 OUTPUT_PATH = args.output_path
-FONT_SIZE = args.font_size
-FONT_SIZE_SUBTITLE = args.font_size_subtitle
-BLUR_RADIUS = args.blur_radius
 PRESERVE_FOOTAGE_ORDERING = args.preserve_footage_ordering
 
 def detect_scenes(video_clip, threshold, sample_rate=20):
@@ -58,46 +45,6 @@ def detect_scenes(video_clip, threshold, sample_rate=20):
         prev_frame = frame_gray
     print("Detected scenes:", len(scene_changes))
     return scene_changes
-
-def create_blurred_clip(middle_scene_clip, blur_radius):
-    print("Creating blurred clip...")
-    blurred_scene_frames = [cv2.GaussianBlur(frame, (blur_radius, blur_radius), 0) 
-                            for frame in middle_scene_clip.iter_frames()]
-    blurred_scene_clip = ImageSequenceClip(blurred_scene_frames, fps=int(middle_scene_clip.fps))
-    return blurred_scene_clip
-
-def create_text_clip(text, font, duration, pos):
-    print("Creating text clip...")
-    text_image = Image.new('RGBA', video_clip.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(text_image)
-    lines = text.encode().decode('unicode_escape').split('\n')
-    max_width = 0
-    total_height = 0
-    line_heights = []
-    for line in lines:  # calculate the dimensions of each line
-        text_width, text_height = draw.textsize(line, font)
-        max_width = max(max_width, text_width)
-        total_height += text_height
-        line_heights.append(text_height)
-
-    if len(lines) > 1:  # if the text contains multiple lines
-        text_x = 100  # 100px from the left side of the screen
-        text_y = (text_image.height - total_height) / 2  # vertically centered
-        for i, line in enumerate(lines):
-            draw.text((text_x, text_y), line, fill='white', font=font)
-            text_y += line_heights[i]  # move to the next line
-    else:  # if the text is a single line
-        text_x = (text_image.width - max_width) / 2
-        text_y = (text_image.height - total_height) / 2
-        draw.text((text_x, text_y), text, fill='white', font=font)
-
-    text_clip = ImageClip(np.array(text_image)).set_duration(duration)
-    if isinstance(pos, tuple) and len(pos) == 2 and pos[0] == "center":
-        text_clip = text_clip.set_position(lambda t: ("center", pos[1] + t * 0))
-    else:
-        text_clip = text_clip.set_position(pos)
-    
-    return text_clip
 
 def merge_segments(segments):
     # Initialize merged segments with the first segment
@@ -276,29 +223,9 @@ threshold = np.mean([np.mean(frame) for frame in frames]) * 1.1
 # Scene detection
 scene_changes = detect_scenes(video_clip, threshold)
 
-# Create intro and outro
-print("Creating intro and outro...")
-middle_scene_time = scene_changes[len(scene_changes)//2]
-middle_scene_clip = video_clip.subclip(middle_scene_time, min(middle_scene_time + SPLASH_SCREEN_DURATION, video_clip.duration))
-blurred_scene_clip = create_blurred_clip(middle_scene_clip, BLUR_RADIUS)
-font_intro = ImageFont.truetype("NexaRustSlab-BlackShadow01.otf", FONT_SIZE)
-intro = CompositeVideoClip([blurred_scene_clip, create_text_clip(GAME_NAME, font_intro, SPLASH_SCREEN_DURATION, "center")])
-
-font_outro_title = ImageFont.truetype("NexaRustSlab-BlackShadow01.otf", int(FONT_SIZE / 2))
-font_outro_url = ImageFont.truetype("arial_bold.ttf", FONT_SIZE_SUBTITLE)
-title_clip = create_text_clip(GAME_NAME, font_outro_title, SPLASH_SCREEN_DURATION, "center")
-
-lines = GAME_NAME.encode().decode('unicode_escape').split('\n')
-url_clip = create_text_clip(SUB_TITLE, font_outro_url, SPLASH_SCREEN_DURATION, ("center", int(FONT_SIZE / 2 * len(lines)) + 20))
-outro = CompositeVideoClip([title_clip, url_clip])
-
 # Create trailer clips
-remaining_duration = TRAILER_DURATION - 2 * SPLASH_SCREEN_DURATION
+remaining_duration = TRAILER_DURATION
 trailer_clips = create_trailer_clips(scene_changes, remaining_duration, MAX_SCENE_DURATION)
-
-# Add intro and outro to the trailer
-trailer_clips.insert(0, intro)
-trailer_clips.append(outro)
 
 # Concatenate the clips to form the final trailer
 print("Concatenating the scenes into final video...")
