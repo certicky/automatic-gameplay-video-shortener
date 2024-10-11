@@ -1,7 +1,7 @@
 # Required Libraries
 import cv2, argparse, librosa, os
 import numpy as np
-from moviepy.editor import VideoFileClip, concatenate_videoclips, ImageClip
+from moviepy.editor import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
 from moviepy.video.fx.fadein import fadein
 from moviepy.video.fx.fadeout import fadeout
 from moviepy.audio.fx.all import audio_fadein, audio_fadeout
@@ -21,6 +21,7 @@ parser.add_argument('--max-scene-duration', type=int, default=7, help='Optional:
 parser.add_argument('--crossfade-duration', type=int, default=1, help='Optional: Duration of the cross-fade between clips (default: 1)')
 parser.add_argument('--output-path', type=str, default='output.mp4', help='Optional: Path & name of the resulting file (default: output.mp4)')
 parser.add_argument('--preserve-footage-ordering', type=bool, default=False, help='Optional: Preserve the ordering of clips from the input footage? (default: false)')
+parser.add_argument('--music-path', type=str, help='Optional: Path to the background music file')
 
 # Assign the arguments to variables
 args = parser.parse_args()
@@ -30,6 +31,7 @@ MAX_SCENE_DURATION = args.max_scene_duration
 CROSSFADE_DURATION = args.crossfade_duration
 OUTPUT_PATH = args.output_path
 PRESERVE_FOOTAGE_ORDERING = args.preserve_footage_ordering
+MUSIC_PATH = args.music_path
 
 def detect_scenes(video_clip, threshold, sample_rate=20):
     print("Detecting scenes...")
@@ -231,5 +233,13 @@ trailer_clips = create_trailer_clips(scene_changes, remaining_duration, MAX_SCEN
 print("Concatenating the scenes into final video...")
 trailer = concatenate_videoclips(trailer_clips)
 
+# Add background music if provided
+if MUSIC_PATH:
+    print("Adding background music from", MUSIC_PATH)
+    music = AudioFileClip(MUSIC_PATH).set_duration(trailer.duration)
+    music = audio_fadeout(music, 3)  # Fade out the music in the last 3 seconds
+    final_audio = CompositeAudioClip([trailer.audio, music])
+    trailer = trailer.set_audio(final_audio)
+
 # Write the trailer to a file
-trailer.write_videofile(OUTPUT_PATH, codec='libx264', fps=30, bitrate="5000k", audio_codec='aac', audio_bitrate='128k', logger=None, verbose=False)
+trailer.write_videofile(OUTPUT_PATH, codec='libx264', bitrate="5000k", audio_codec='aac', audio_bitrate='128k', logger=None, verbose=False)
